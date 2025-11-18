@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>เดโม่สแกนบัตรประชาชนจากกล้องมือถือ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #f3f4f6;
+      display: flex;
+      justify-content: center;
+    }
+    .container {
+      max-width: 960px;
+      width: 100%;
+    }
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 4px;
+    }
+    .subtitle {
+      font-size: 0.9rem;
+      color: #4b5563;
+      margin-bottom: 16px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 768px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+    .card {
+      background: #ffffff;
+      padding: 16px;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+    .card-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 1rem;
+      color: #111827;
+    }
+    .card-desc {
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+    .field {
+      margin-bottom: 10px;
+    }
+    .field label {
+      display: block;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+      color: #374151;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: transform 0.05s ease, box-shadow 0.1s ease, background 0.1s ease;
+    }
+    .btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 0 0 rgba(0,0,0,0);
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.35);
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+    .btn-danger {
+      background: #f97373;
+      color: #111827;
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .preview-wrapper {
+      margin-top: 8px;
+      margin-bottom: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #cameraPreview {
+      width: 100%;
+      max-height: 260px;
+      border-radius: 10px;
+      background: #000;
+      object-fit: cover;
+    }
+    #capturedImage {
+      max-width: 100%;
+      max-height: 180px;
+      border-radius: 10px;
+      border: 1px dashed #d1d5db;
+      display: none;
+      object-fit: contain;
+      background: #f9fafb;
+    }
+    .status {
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+    .status.success {
+      color: #15803d;
+    }
+    .status.error {
+      color: #b91c1c;
+    }
+    .pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      background: #eef2ff;
+      color: #4f46e5;
+      margin-bottom: 6px;
+    }
+    .footer-note {
+      font-size: 0.7rem;
+      color: #6b7280;
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+    .field input,
+    .field textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    .field input:focus,
+    .field textarea:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 1px #2563eb33;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>เดโม่สแกนบัตรประชาชนจากกล้องมือถือ (Live Camera)</h1>
+    <p class="subtitle">
+      เปิดกล้องมือถือ &gt; ส่องหน้าบัตร &gt; กด “ถ่าย &amp; สแกนบัตร” &gt; ระบบจำลอง OCR แล้วเติมฟิลด์ให้อัตโนมัติ  
+      <br>เดโม่นี้ยังเป็น mock data สำหรับทดสอบ UX/Flow เท่านั้น
+    </p>
+
+    <div class="layout">
+      <!-- ซ้าย: กล้อง + สแกน -->
+      <div class="card">
+        <div class="pill">ขั้นตอนที่ 1 : เปิดกล้อง &amp; สแกนบัตร</div>
+        <div class="card-title">เปิดกล้องหลังมือถือ</div>
+        <p class="card-desc">
+          กดปุ่ม “เปิดกล้อง” ระบบจะขอกล้องหลัง (ถ้าเปิดบน HTTPS เช่น Vercel / localhost)  
+          จากนั้นถือบัตรให้เต็มเฟรม แล้วกด “ถ่ายรูป &amp; สแกนบัตร”
+        </p>
+
+        <div class="field" style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-primary" id="openCameraButton">
+            📷 เปิดกล้อง
+          </button>
+          <button class="btn btn-secondary" id="captureButton" disabled>
+            🔍 ถ่ายรูป &amp; สแกนบัตร
+          </button>
+          <button class="btn btn-secondary" id="closeCameraButton" disabled>
+            ✖️ ปิดกล้อง
+          </button>
+        </div>
+
+        <div class="preview-wrapper">
+          <video id="cameraPreview" autoplay playsinline muted></video>
+
+          <div>
+            <label style="font-size:0.8rem; color:#4b5563;">
+              ภาพที่ถ่ายได้ (ใช้ส่งเข้า OCR)
+            </label>
+            <img id="capturedImage" alt="ภาพบัตรที่ถ่ายจากกล้อง" />
+          </div>
+        </div>
+
+        <div id="scanStatus" class="status"></div>
+
+        <p class="footer-note">
+          ⚠️ โปรดใช้ข้อมูลทดสอบเท่านั้น หากต้องใช้ข้อมูลบัตรจริง ต้องมีมาตรการ PDPA / เข้ารหัส / เก็บ log / จำกัดสิทธิ์การเข้าถึง ฯลฯ
+        </p>
+      </div>
+
+      <!-- ขวา: ฟอร์ม autofill -->
+      <div class="card">
+        <div class="pill">ขั้นตอนที่ 2 : ข้อมูลจากบัตร (autofill)</div>
+        <div class="card-title">ฟอร์มข้อมูลลูกค้า</div>
+        <p class="card-desc">
+          หลังสแกนเสร็จ ระบบจะเติม mock data ลงฟิลด์ คุณสามารถแก้ไขก่อนบันทึกได้
+        </p>
+
+        <form id="idForm" onsubmit="return false;">
+          <div class="field">
+            <label for="citizenId">เลขบัตรประชาชน</label>
+            <input id="citizenId" name="citizenId" maxlength="13" />
+          </div>
+
+          <div class="field">
+            <label for="firstName">ชื่อ</label>
+            <input id="firstName" name="firstName" />
+          </div>
+
+          <div class="field">
+            <label for="lastName">นามสกุล</label>
+            <input id="lastName" name="lastName" />
+          </div>
+
+          <div class="field">
+            <label for="dob">วันเดือนปีเกิด (เช่น 14-11-1988)</label>
+            <input id="dob" name="dob" placeholder="dd-mm-yyyy" />
+          </div>
+
+          <div class="field">
+            <label for="address">ที่อยู่ตามบัตร</label>
+            <textarea id="address" name="address" rows="4"></textarea>
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-secondary"
+            id="saveButton"
+          >
+            💾 บันทึก (เดโม่)
+          </button>
+          <div id="saveStatus" class="status"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const openCameraButton = document.getElementById("openCameraButton");
+    const closeCameraButton = document.getElementById("closeCameraButton");
+    const captureButton = document.getElementById("captureButton");
+    const cameraPreview = document.getElementById("cameraPreview");
+    const capturedImage = document.getElementById("capturedImage");
+    const scanStatus = document.getElementById("scanStatus");
+    const saveButton = document.getElementById("saveButton");
+    const saveStatus = document.getElementById("saveStatus");
+
+    const citizenIdInput = document.getElementById("citizenId");
+    const firstNameInput = document.getElementById("firstName");
+    const lastNameInput = document.getElementById("lastName");
+    const dobInput = document.getElementById("dob");
+    const addressInput = document.getElementById("address");
+
+    let cameraStream = null;
+
+    // เปิดกล้อง
+    openCameraButton.addEventListener("click", async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        scanStatus.textContent = "เบราว์เซอร์ไม่รองรับ getUserMedia / การเปิดกล้อง";
+        scanStatus.className = "status error";
+        return;
+      }
+
+      try {
+        scanStatus.textContent = "กำลังขอสิทธิ์ใช้งานกล้อง...";
+        scanStatus.className = "status";
+
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }, // ขอใช้กล้องหลังถ้ามี
+          audio: false,
+        });
+
+        cameraPreview.srcObject = cameraStream;
+        captureButton.disabled = false;
+        closeCameraButton.disabled = false;
+
+        scanStatus.textContent = "กล้องพร้อมใช้งาน จัดบัตรให้เต็มเฟรมแล้วกด “ถ่ายรูป & สแกนบัตร”";
+        scanStatus.className = "status success";
+      } catch (error) {
+        console.error("Error opening camera:", error);
+        scanStatus.textContent = "ไม่สามารถเปิดกล้องได้ (อาจถูกบล็อก หรือไม่ใช่ HTTPS)";
+        scanStatus.className = "status error";
+      }
+    });
+
+    // ปิดกล้อง
+    closeCameraButton.addEventListener("click", () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+        cameraStream = null;
+      }
+      cameraPreview.srcObject = null;
+      captureButton.disabled = true;
+      closeCameraButton.disabled = true;
+
+      scanStatus.textContent = "ปิดกล้องแล้ว";
+      scanStatus.className = "status";
+    });
+
+    // ถ่ายรูป & สแกน (mock OCR)
+    captureButton.addEventListener("click", async () => {
+      if (!cameraStream) {
+        scanStatus.textContent = "ยังไม่ได้เปิดกล้อง";
+        scanStatus.className = "status error";
+        return;
+      }
+
+      const video = cameraPreview;
+      if (!video.videoWidth || !video.videoHeight) {
+        scanStatus.textContent = "กล้องยังไม่พร้อม ลองรอสักครู่แล้วกดใหม่อีกครั้ง";
+        scanStatus.className = "status error";
+        return;
+      }
+
+      // สร้าง canvas เพื่อดึงภาพจาก video frame ปัจจุบัน
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageDataUrl = canvas.toDataURL("image/png");
+      capturedImage.src = imageDataUrl;
+      capturedImage.style.display = "block";
+
+      scanStatus.textContent = "กำลังจำลองสแกนบัตร...";
+      scanStatus.className = "status";
+
+      try {
+        const result = await mockOcrFromImage(imageDataUrl);
+
+        // Autofill ฟอร์ม
+        citizenIdInput.value = result.citizenId || "";
+        firstNameInput.value = result.firstName || "";
+        lastNameInput.value = result.lastName || "";
+        dobInput.value = result.dob || "";
+        addressInput.value = result.address || "";
+
+        scanStatus.textContent =
+          "สแกนสำเร็จ (mock data) — สามารถแก้ไขข้อมูลก่อนบันทึกได้";
+        scanStatus.className = "status success";
+      } catch (error) {
+        console.error("OCR mock error:", error);
+        scanStatus.textContent = "เกิดข้อผิดพลาดในการสแกน (เดโม่)";
+        scanStatus.className = "status error";
+      }
+    });
+
+    // ปุ่มบันทึก (เดโม่)
+    saveButton.addEventListener("click", () => {
+      const payload = {
+        citizenId: citizenIdInput.value,
+        firstName: firstNameInput.value,
+        lastName: lastNameInput.value,
+        dob: dobInput.value,
+        address: addressInput.value,
+      };
+
+      console.log("Demo payload:", payload);
+      saveStatus.textContent =
+        "เดโม่: ข้อมูลถูกเตรียมส่งแล้ว (ลองดูใน Console ของ Browser)";
+      saveStatus.className = "status success";
+    });
+
+    // ฟังก์ชัน mock OCR — โปรดักชันจริงให้เปลี่ยนเป็นเรียก OCR API
+    function mockOcrFromImage(imageDataUrl) {
+      // คุณสามารถส่ง imageDataUrl ไป backend เพื่อเรียก OCR จริงได้ที่นี่
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const mockResult = {
+            citizenId: "1234567890123",
+            firstName: "สมชาย",
+            lastName: "ใจดี",
+            dob: "01-01-1990",
+            address:
+              "99/9 หมู่ 9 ถนนตัวอย่าง แขวงทดสอบ เขตตัวอย่าง กรุงเทพมหานคร 10110",
+          };
+          resolve(mockResult);
+        }, 1500); // ดีเลย์ 1.5 วินาที จำลองเรียก API
+      });
+    }
+  </script>
+</body>
+</html>
