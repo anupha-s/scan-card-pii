@@ -2,8 +2,11 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <title>เดโม่สแกนบัตรประชาชนจากกล้องมือถือ</title>
+  <title>เดโม่สแกนบัตรประชาชนจากกล้องมือถือ (OCR จริง)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- โหลด Tesseract.js จาก CDN -->
+  <script src="https://unpkg.com/tesseract.js@v4.1.1/dist/tesseract.min.js"></script>
+
   <style>
     * {
       box-sizing: border-box;
@@ -91,10 +94,6 @@
       background: #e5e7eb;
       color: #111827;
     }
-    .btn-danger {
-      background: #f97373;
-      color: #111827;
-    }
     .btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
@@ -163,14 +162,18 @@
       border-color: #2563eb;
       box-shadow: 0 0 0 1px #2563eb33;
     }
+    #ocrRaw {
+      font-size: 0.75rem;
+      color: #4b5563;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>เดโม่สแกนบัตรประชาชนจากกล้องมือถือ (Live Camera)</h1>
+    <h1>เดโม่สแกนบัตรประชาชนจากกล้องมือถือ (OCR จริง)</h1>
     <p class="subtitle">
-      เปิดกล้องมือถือ &gt; ส่องหน้าบัตร &gt; กด “ถ่าย &amp; สแกนบัตร” &gt; ระบบจำลอง OCR แล้วเติมฟิลด์ให้อัตโนมัติ  
-      <br>เดโม่นี้ยังเป็น mock data สำหรับทดสอบ UX/Flow เท่านั้น
+      เปิดกล้องมือถือ &gt; ส่องหน้าบัตร &gt; กด “ถ่าย &amp; สแกนบัตร” &gt; ระบบใช้ Tesseract.js อ่านตัวหนังสือจากรูป  
+      <br>เดโม่นี้จะดึงเลขบัตร 13 หลักจาก OCR และเติมให้ในฟิลด์อัตโนมัติ
     </p>
 
     <div class="layout">
@@ -179,8 +182,8 @@
         <div class="pill">ขั้นตอนที่ 1 : เปิดกล้อง &amp; สแกนบัตร</div>
         <div class="card-title">เปิดกล้องหลังมือถือ</div>
         <p class="card-desc">
-          กดปุ่ม “เปิดกล้อง” ระบบจะขอกล้องหลัง (ถ้าเปิดบน HTTPS เช่น Vercel / localhost)  
-          จากนั้นถือบัตรให้เต็มเฟรม แล้วกด “ถ่ายรูป &amp; สแกนบัตร”
+          กด “เปิดกล้อง” → เล็งบัตรให้อยู่ในเฟรมชัด ๆ → กด “ถ่ายรูป &amp; สแกนบัตร”  
+          แนะนำให้ทดสอบบน HTTPS (เช่น Vercel / localhost ที่เป็น secure)
         </p>
 
         <div class="field" style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -200,7 +203,7 @@
 
           <div>
             <label style="font-size:0.8rem; color:#4b5563;">
-              ภาพที่ถ่ายได้ (ใช้ส่งเข้า OCR)
+              ภาพที่ถ่ายได้ (จะใช้ส่งเข้า OCR)
             </label>
             <img id="capturedImage" alt="ภาพบัตรที่ถ่ายจากกล้อง" />
           </div>
@@ -209,42 +212,49 @@
         <div id="scanStatus" class="status"></div>
 
         <p class="footer-note">
-          ⚠️ โปรดใช้ข้อมูลทดสอบเท่านั้น หากต้องใช้ข้อมูลบัตรจริง ต้องมีมาตรการ PDPA / เข้ารหัส / เก็บ log / จำกัดสิทธิ์การเข้าถึง ฯลฯ
+          ⚠️ เดโม่นี้ใช้ OCR ฝั่งหน้าเว็บ (Tesseract.js) เหมาะสำหรับ POC/ทดสอบ UX  
+          หากใช้กับข้อมูลจริง ควรมี backend, เข้ารหัส, PDPA, log และสิทธิ์การเข้าถึงที่ชัดเจน
         </p>
       </div>
 
       <!-- ขวา: ฟอร์ม autofill -->
       <div class="card">
         <div class="pill">ขั้นตอนที่ 2 : ข้อมูลจากบัตร (autofill)</div>
-        <div class="card-title">ฟอร์มข้อมูลลูกค้า</div>
+        <div class="card-title">ฟอร์มข้อมูลจาก OCR</div>
         <p class="card-desc">
-          หลังสแกนเสร็จ ระบบจะเติม mock data ลงฟิลด์ คุณสามารถแก้ไขก่อนบันทึกได้
+          ระบบจะพยายามดึง “เลขบัตรประชาชน 13 หลัก” จากข้อความ OCR  
+          และเติมให้ในฟิลด์ด้านล่าง พร้อมแสดงข้อความ OCR ทั้งหมดให้ดู
         </p>
 
         <form id="idForm" onsubmit="return false;">
           <div class="field">
-            <label for="citizenId">เลขบัตรประชาชน</label>
+            <label for="citizenId">เลขบัตรประชาชน (ดึงจาก OCR)</label>
             <input id="citizenId" name="citizenId" maxlength="13" />
           </div>
 
           <div class="field">
-            <label for="firstName">ชื่อ</label>
-            <input id="firstName" name="firstName" />
+            <label for="firstName">ชื่อ (ตอนนี้ยังไม่ได้ parse อัตโนมัติ)</label>
+            <input id="firstName" name="firstName" placeholder="ใส่เองจาก OCR raw" />
           </div>
 
           <div class="field">
-            <label for="lastName">นามสกุล</label>
-            <input id="lastName" name="lastName" />
+            <label for="lastName">นามสกุล (ตอนนี้ยังไม่ได้ parse อัตโนมัติ)</label>
+            <input id="lastName" name="lastName" placeholder="ใส่เองจาก OCR raw" />
           </div>
 
           <div class="field">
-            <label for="dob">วันเดือนปีเกิด (เช่น 14-11-1988)</label>
+            <label for="dob">วันเดือนปีเกิด (ใส่เองตอนนี้)</label>
             <input id="dob" name="dob" placeholder="dd-mm-yyyy" />
           </div>
 
           <div class="field">
-            <label for="address">ที่อยู่ตามบัตร</label>
-            <textarea id="address" name="address" rows="4"></textarea>
+            <label for="address">ที่อยู่ตามบัตร (ใส่เองจาก OCR raw)</label>
+            <textarea id="address" name="address" rows="3"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="ocrRaw">ผลลัพธ์ข้อความจาก OCR (ดู/คัดลอกข้อมูลจากตรงนี้)</label>
+            <textarea id="ocrRaw" rows="6" readonly></textarea>
           </div>
 
           <button
@@ -275,13 +285,14 @@
     const lastNameInput = document.getElementById("lastName");
     const dobInput = document.getElementById("dob");
     const addressInput = document.getElementById("address");
+    const ocrRawTextarea = document.getElementById("ocrRaw");
 
     let cameraStream = null;
 
     // เปิดกล้อง
     openCameraButton.addEventListener("click", async () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        scanStatus.textContent = "เบราว์เซอร์ไม่รองรับ getUserMedia / การเปิดกล้อง";
+        scanStatus.textContent = "เบราว์เซอร์ไม่รองรับการเปิดกล้อง (getUserMedia)";
         scanStatus.className = "status error";
         return;
       }
@@ -291,7 +302,7 @@
         scanStatus.className = "status";
 
         cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" }, // ขอใช้กล้องหลังถ้ามี
+          video: { facingMode: "environment" }, // ขอใช้กล้องหลัง
           audio: false,
         });
 
@@ -299,11 +310,13 @@
         captureButton.disabled = false;
         closeCameraButton.disabled = false;
 
-        scanStatus.textContent = "กล้องพร้อมใช้งาน จัดบัตรให้เต็มเฟรมแล้วกด “ถ่ายรูป & สแกนบัตร”";
+        scanStatus.textContent =
+          "กล้องพร้อมใช้งาน จัดบัตรให้ชัดในเฟรมแล้วกด “ถ่ายรูป & สแกนบัตร”";
         scanStatus.className = "status success";
       } catch (error) {
         console.error("Error opening camera:", error);
-        scanStatus.textContent = "ไม่สามารถเปิดกล้องได้ (อาจถูกบล็อก หรือไม่ใช่ HTTPS)";
+        scanStatus.textContent =
+          "ไม่สามารถเปิดกล้องได้ (อาจถูกบล็อก หรือไม่ได้รันบน HTTPS)";
         scanStatus.className = "status error";
       }
     });
@@ -322,7 +335,7 @@
       scanStatus.className = "status";
     });
 
-    // ถ่ายรูป & สแกน (mock OCR)
+    // ถ่ายรูป & ส่งเข้า OCR จริง
     captureButton.addEventListener("click", async () => {
       if (!cameraStream) {
         scanStatus.textContent = "ยังไม่ได้เปิดกล้อง";
@@ -332,12 +345,12 @@
 
       const video = cameraPreview;
       if (!video.videoWidth || !video.videoHeight) {
-        scanStatus.textContent = "กล้องยังไม่พร้อม ลองรอสักครู่แล้วกดใหม่อีกครั้ง";
+        scanStatus.textContent = "กล้องยังไม่พร้อม ลองรอ 1–2 วินาทีแล้วกดใหม่อีกครั้ง";
         scanStatus.className = "status error";
         return;
       }
 
-      // สร้าง canvas เพื่อดึงภาพจาก video frame ปัจจุบัน
+      // 1) Capture frame จาก video
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -348,25 +361,40 @@
       capturedImage.src = imageDataUrl;
       capturedImage.style.display = "block";
 
-      scanStatus.textContent = "กำลังจำลองสแกนบัตร...";
+      // 2) ส่งเข้า OCR ด้วย Tesseract.js
+      scanStatus.textContent = "กำลังอ่านข้อมูลจากรูปด้วย OCR (อาจใช้เวลา 5–10 วิ)...";
       scanStatus.className = "status";
 
       try {
-        const result = await mockOcrFromImage(imageDataUrl);
+        const result = await Tesseract.recognize(imageDataUrl, "eng", {
+          logger: (m) => console.log(m),
+        });
 
-        // Autofill ฟอร์ม
-        citizenIdInput.value = result.citizenId || "";
-        firstNameInput.value = result.firstName || "";
-        lastNameInput.value = result.lastName || "";
-        dobInput.value = result.dob || "";
-        addressInput.value = result.address || "";
+        const text = (result.data && result.data.text) ? result.data.text : "";
+        console.log("OCR text:", text);
+
+        // แสดง raw text ทั้งหมดจาก OCR
+        ocrRawTextarea.value = text.trim();
+
+        // 3) พยายามดึงเลขบัตร 13 หลักจากข้อความ OCR
+        //    - ลบทุกอย่างที่ไม่ใช่ตัวเลขออก แล้วหากลุ่มเลข 13 หลัก
+        const digitsOnly = text.replace(/\D/g, ""); // เก็บเฉพาะ 0-9
+        const idMatch = digitsOnly.match(/(\d{13})/);
+
+        if (idMatch) {
+          citizenIdInput.value = idMatch[1];
+        } else {
+          citizenIdInput.value = "";
+        }
 
         scanStatus.textContent =
-          "สแกนสำเร็จ (mock data) — สามารถแก้ไขข้อมูลก่อนบันทึกได้";
-        scanStatus.className = "status success";
+          idMatch
+            ? "อ่านเลขบัตรจาก OCR ได้แล้ว (ตรวจสอบความถูกต้องอีกครั้งก่อนใช้งานจริง)"
+            : "อ่าน OCR เสร็จ แต่ยังหาเลขบัตร 13 หลักไม่เจอ ลองจัดบัตรให้ชัดขึ้นแล้วสแกนใหม่";
+        scanStatus.className = idMatch ? "status success" : "status error";
       } catch (error) {
-        console.error("OCR mock error:", error);
-        scanStatus.textContent = "เกิดข้อผิดพลาดในการสแกน (เดโม่)";
+        console.error("OCR error:", error);
+        scanStatus.textContent = "เกิดข้อผิดพลาดระหว่างอ่าน OCR";
         scanStatus.className = "status error";
       }
     });
@@ -379,6 +407,7 @@
         lastName: lastNameInput.value,
         dob: dobInput.value,
         address: addressInput.value,
+        ocrText: ocrRawTextarea.value,
       };
 
       console.log("Demo payload:", payload);
@@ -386,24 +415,6 @@
         "เดโม่: ข้อมูลถูกเตรียมส่งแล้ว (ลองดูใน Console ของ Browser)";
       saveStatus.className = "status success";
     });
-
-    // ฟังก์ชัน mock OCR — โปรดักชันจริงให้เปลี่ยนเป็นเรียก OCR API
-    function mockOcrFromImage(imageDataUrl) {
-      // คุณสามารถส่ง imageDataUrl ไป backend เพื่อเรียก OCR จริงได้ที่นี่
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          const mockResult = {
-            citizenId: "1234567890123",
-            firstName: "สมชาย",
-            lastName: "ใจดี",
-            dob: "01-01-1990",
-            address:
-              "99/9 หมู่ 9 ถนนตัวอย่าง แขวงทดสอบ เขตตัวอย่าง กรุงเทพมหานคร 10110",
-          };
-          resolve(mockResult);
-        }, 1500); // ดีเลย์ 1.5 วินาที จำลองเรียก API
-      });
-    }
   </script>
 </body>
 </html>
