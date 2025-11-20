@@ -2,10 +2,8 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <title>เดโม่สแกนบัตรประชาชนจากกล้องสด (Live OCR)</title>
+  <title>เดโม่สแกนบัตรประชาชนจากกล้องสด (ThaiPersonalCardExtract)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- โหลด Tesseract.js จาก CDN -->
-  <script src="https://unpkg.com/tesseract.js@v4.1.1/dist/tesseract.min.js"></script>
 
   <style>
     * {
@@ -166,14 +164,29 @@
       font-size: 0.75rem;
       color: #4b5563;
     }
+    .config-section {
+      background: #fef3c7;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      border: 1px solid #fbbf24;
+    }
+    .config-section label {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #92400e;
+    }
+    .config-section input {
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>เดโม่สแกนบัตรประชาชนจากกล้องสด (Live OCR)</h1>
+    <h1>เดโม่สแกนบัตรประชาชนจากกล้องสด (ThaiPersonalCardExtract)</h1>
     <p class="subtitle">
-      กด “เปิดกล้อง &amp; เริ่มสแกน” แล้วเอาบัตรจ่อหน้ากล้อง  
-      ระบบจะ OCR ภาพเป็นช่วง ๆ และพยายามดึงเลขบัตร, ชื่อ, นามสกุล, วันเกิด, ที่อยู่ มาเติมฟอร์มให้อัตโนมัติ
+      กด "เปิดกล้อง &amp; เริ่มสแกน" แล้วเอาบัตรจ่อหน้ากล้อง  
+      ระบบใช้ ThaiPersonalCardExtract (Python OCR) ที่ออกแบบมาเฉพาะบัตรประชาชนไทย เพื่อความแม่นยำสูงสุด
     </p>
 
     <div class="layout">
@@ -185,6 +198,19 @@
           แนะนำให้ใช้งานบน HTTPS (เช่น Vercel / Netlify / localhost ที่เป็น secure)  
           เปิดกล้อง &gt; เอาบัตรจ่อให้ชัด &gt; ระบบจะสแกนอัตโนมัติทุก ๆ 5 วินาที
         </p>
+
+        <div class="config-section">
+          <label for="apiUrl">🔧 API Endpoint (Backend URL)</label>
+          <input 
+            type="text" 
+            id="apiUrl" 
+            value="/api/scan-card"
+            placeholder="/api/scan-card หรือ https://your-app.vercel.app/api/scan-card"
+          />
+          <p style="font-size:0.7rem; margin-top:4px; color:#92400e;">
+            💡 ใช้ /api/scan-card สำหรับ Vercel deployment หรือ http://localhost:5000/api/scan-card สำหรับ local
+          </p>
+        </div>
 
         <div class="field" style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn btn-primary" id="openCameraButton">
@@ -209,8 +235,9 @@
         <div id="scanStatus" class="status"></div>
 
         <p class="footer-note">
-          ⚠️ เดโม่นี้ใช้ OCR ฝั่งหน้าเว็บ (Tesseract.js) ความแม่นยำขึ้นอยู่กับความคมชัด แสง และมุมกล้อง  
-          ถ้าใช้กับข้อมูลจริงควรมี backend / encryption / PDPA / access control ให้ครบ
+          ⚠️ เดโม่นี้ใช้ ThaiPersonalCardExtract (Python backend) ที่ออกแบบมาเฉพาะบัตรประชาชนไทย  
+          ความแม่นยำสูงกว่า Tesseract.js ทั่วไป แต่ยังขึ้นอยู่กับความคมชัด แสง และมุมกล้อง  
+          ถ้าใช้กับข้อมูลจริงควรมี encryption / PDPA / access control ให้ครบ
         </p>
       </div>
 
@@ -245,13 +272,28 @@
           </div>
 
           <div class="field">
+            <label for="religion">ศาสนา</label>
+            <input id="religion" name="religion" />
+          </div>
+
+          <div class="field">
             <label for="address">ที่อยู่ตามบัตร</label>
             <textarea id="address" name="address" rows="3"></textarea>
           </div>
 
           <div class="field">
-            <label for="ocrRaw">ผลลัพธ์ข้อความจาก OCR (อ่านจากกล้องสด)</label>
-            <textarea id="ocrRaw" rows="6" readonly></textarea>
+            <label for="issueDate">วันออกบัตร</label>
+            <input id="issueDate" name="issueDate" />
+          </div>
+
+          <div class="field">
+            <label for="expireDate">วันหมดอายุ</label>
+            <input id="expireDate" name="expireDate" />
+          </div>
+
+          <div class="field">
+            <label for="ocrRaw">ผลลัพธ์ข้อความจาก OCR (JSON Response)</label>
+            <textarea id="ocrRaw" rows="4" readonly></textarea>
           </div>
 
           <button
@@ -275,12 +317,16 @@
     const scanStatus = document.getElementById("scanStatus");
     const saveButton = document.getElementById("saveButton");
     const saveStatus = document.getElementById("saveStatus");
+    const apiUrlInput = document.getElementById("apiUrl");
 
     const citizenIdInput = document.getElementById("citizenId");
     const firstNameInput = document.getElementById("firstName");
     const lastNameInput = document.getElementById("lastName");
     const dobInput = document.getElementById("dob");
+    const religionInput = document.getElementById("religion");
     const addressInput = document.getElementById("address");
+    const issueDateInput = document.getElementById("issueDate");
+    const expireDateInput = document.getElementById("expireDate");
     const ocrRawTextarea = document.getElementById("ocrRaw");
 
     let cameraStream = null;
@@ -355,7 +401,7 @@
       stopScanningAndCamera();
     });
 
-    // ฟังก์ชันหลัก: OCR จากเฟรมกล้อง + parse ค่าเข้าแต่ละฟิลด์
+    // ฟังก์ชันหลัก: OCR จากเฟรมกล้อง + ส่งไป backend API
     async function scanCurrentFrameWithOCR() {
       if (!cameraStream) return;
       if (isScanningFrame) return;
@@ -382,126 +428,69 @@
         capturedImage.src = imageDataUrl;
         capturedImage.style.display = "block";
 
-        // 2) OCR จริงด้วย Tesseract
-        const result = await Tesseract.recognize(imageDataUrl, "eng", {
-          logger: (m) => console.log(m),
+        // 2) ส่งภาพไปยัง backend API
+        const apiUrl = apiUrlInput.value.trim();
+        if (!apiUrl) {
+          throw new Error("กรุณาระบุ API URL");
+        }
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image: imageDataUrl
+          })
         });
 
-        const text = (result.data && result.data.text) ? result.data.text : "";
-        console.log("OCR text:", text);
-        ocrRawTextarea.value = text.trim();
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        }
 
-        // 3) ใช้ฟังก์ชัน helper parse ข้อมูลทุกฟิลด์จากข้อความ OCR
-        const fields = parseIdCardFields(text);
+        const result = await response.json();
+        console.log("API Response:", result);
 
-        citizenIdInput.value = fields.citizenId || "";
-        firstNameInput.value = fields.firstName || "";
-        lastNameInput.value = fields.lastName || "";
-        dobInput.value = fields.dob || "";
-        addressInput.value = fields.address || "";
+        if (!result.success) {
+          throw new Error(result.error || 'Unknown error');
+        }
+
+        // 3) เติมข้อมูลลงในฟอร์ม
+        const data = result.data;
+        citizenIdInput.value = data.citizenId || "";
+        firstNameInput.value = data.firstName || "";
+        lastNameInput.value = data.lastName || "";
+        dobInput.value = data.dob || "";
+        religionInput.value = data.religion || "";
+        addressInput.value = data.address || "";
+        issueDateInput.value = data.issueDate || "";
+        expireDateInput.value = data.expireDate || "";
+        ocrRawTextarea.value = JSON.stringify(result.raw, null, 2);
 
         // สร้างข้อความ status ตามว่าหาอะไรได้บ้าง
         const found = [];
-        if (fields.citizenId) found.push("เลขบัตร");
-        if (fields.firstName || fields.lastName) found.push("ชื่อ-นามสกุล");
-        if (fields.dob) found.push("วันเกิด");
-        if (fields.address) found.push("ที่อยู่");
+        if (data.citizenId) found.push("เลขบัตร");
+        if (data.firstName || data.lastName) found.push("ชื่อ-นามสกุล");
+        if (data.dob) found.push("วันเกิด");
+        if (data.address) found.push("ที่อยู่");
+        if (data.religion) found.push("ศาสนา");
 
         if (found.length > 0) {
           scanStatus.textContent =
-            "อ่านข้อมูลจาก OCR สำเร็จ: " + found.join(", ") + " (กรุณาตรวจทานก่อนบันทึก)";
+            "✅ อ่านข้อมูลจาก OCR สำเร็จ: " + found.join(", ") + " (กรุณาตรวจทานก่อนบันทึก)";
           scanStatus.className = "status success";
         } else {
           scanStatus.textContent =
-            "สแกนเสร็จ แต่ยัง parse ฟิลด์ไม่ค่อยได้ ลองให้บัตรชัดขึ้นหรือขยับกล้องใหม่";
+            "⚠️ สแกนเสร็จ แต่ยัง parse ฟิลด์ไม่ค่อยได้ ลองให้บัตรชัดขึ้นหรือขยับกล้องใหม่";
           scanStatus.className = "status error";
         }
       } catch (error) {
         console.error("OCR error:", error);
-        scanStatus.textContent = "เกิดข้อผิดพลาดระหว่างอ่าน OCR";
+        scanStatus.textContent = "❌ เกิดข้อผิดพลาด: " + error.message;
         scanStatus.className = "status error";
       } finally {
         isScanningFrame = false;
       }
-    }
-
-    // 🧠 ฟังก์ชัน helper: พยายามดึง citizenId, firstName, lastName, dob, address จากข้อความ OCR
-    function parseIdCardFields(text) {
-      const fields = {
-        citizenId: "",
-        firstName: "",
-        lastName: "",
-        dob: "",
-        address: "",
-      };
-
-      if (!text) return fields;
-
-      // แยกเป็นบรรทัด ๆ
-      const lines = text
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0);
-
-      // 1) เลขบัตร 13 หลัก (ตัดทุกอย่างที่ไม่ใช่ตัวเลขออก)
-      const digitsOnly = text.replace(/\D/g, "");
-      const idMatch = digitsOnly.match(/(\d{13})/);
-      if (idMatch) {
-        fields.citizenId = idMatch[1];
-      }
-
-      // 2) วันเกิด: หา pattern วันที่ง่าย ๆ เช่น dd-mm-yyyy, dd/mm/yyyy, dd.mm.yyyy
-      const dobMatch =
-        text.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/) ||
-        text.match(/(\d{1,2}\s+[A-Za-z]{3,}\s+\d{2,4})/); // 01 JAN 1990
-      if (dobMatch) {
-        fields.dob = dobMatch[1];
-      }
-
-      // 3) ชื่อ–นามสกุล:
-      //    พยายามหาบรรทัดที่มีคำว่า Name / ชื่อ / นาย / นางสาว / นาง / Mr / Miss
-      let nameLine =
-        lines.find((l) =>
-          /(Name|ชื่อ|นาย|นางสาว|นาง|Mr\.?|Mrs\.?|Miss)/i.test(l)
-        ) || null;
-
-      // ถ้าไม่เจอ ลองเดาว่าอยู่แถว ๆ บรรทัดที่ 2-4
-      if (!nameLine && lines.length >= 3) {
-        nameLine = lines[2];
-      }
-
-      if (nameLine) {
-        // ลบคำ label ออกก่อน เช่น Name, ชื่อ, Surname, Last Name
-        const cleaned = nameLine
-          .replace(/(Name|ชื่อ|นามสกุล|Surname|Last\s*Name|LastName)/gi, "")
-          .trim();
-        const tokens = cleaned.split(/\s+/).filter(Boolean);
-
-        if (tokens.length >= 2) {
-          fields.firstName = tokens[0];
-          fields.lastName = tokens.slice(1).join(" ");
-        } else if (tokens.length === 1) {
-          fields.firstName = tokens[0];
-        }
-      }
-
-      // 4) ที่อยู่:
-      //    หาบรรทัดที่มีคำว่า Address / ที่อยู่ ถ้าเจอรวมบรรทัดถัด ๆ ไปให้เป็น address
-      let addrIndex = lines.findIndex((l) =>
-        /(Address|ที่อยู่)/i.test(l)
-      );
-      if (addrIndex >= 0) {
-        fields.address = lines.slice(addrIndex).join(" ");
-      } else {
-        // ถ้าไม่เจอ label เลย ใช้บรรทัดท้าย ๆ เป็น address แทน
-        if (lines.length >= 3) {
-          fields.address = lines.slice(-3).join(" ");
-        } else {
-          fields.address = lines.join(" ");
-        }
-      }
-
-      return fields;
     }
 
     // ปุ่มบันทึก (เดโม่)
@@ -511,13 +500,16 @@
         firstName: firstNameInput.value,
         lastName: lastNameInput.value,
         dob: dobInput.value,
+        religion: religionInput.value,
         address: addressInput.value,
+        issueDate: issueDateInput.value,
+        expireDate: expireDateInput.value,
         ocrText: ocrRawTextarea.value,
       };
 
       console.log("Demo payload:", payload);
       saveStatus.textContent =
-        "เดโม่: ข้อมูลถูกเตรียมส่งแล้ว (ลองดูใน Console ของ Browser)";
+        "✅ เดโม่: ข้อมูลถูกเตรียมส่งแล้ว (ลองดูใน Console ของ Browser)";
       saveStatus.className = "status success";
     });
   </script>

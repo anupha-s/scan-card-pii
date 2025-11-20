@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: thai-id-card-scanner
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: |
+      apt-get update
+      apt-get install -y tesseract-ocr tesseract-ocr-tha tesseract-ocr-eng
+      pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10
+      - key: FLASK_ENV
+        value: production
+    healthCheckPath: /api/health
