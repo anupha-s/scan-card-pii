@@ -26,7 +26,8 @@ thai-id-card-scanner/
 └── ⚙️ Config
     └── .gitignore             # Git ignore rules
 ```
-
+  
+  
 ## 📁 คำอธิบายไฟล์สำคัญ
 
 ### Frontend

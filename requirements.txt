@@ -1,6 +1,6 @@
 flask==3.0.0
 flask-cors==4.0.0
-git+https://github.com/ggafiled/ThaiPersonalCardExtract.git
+pytesseract==0.3.10
 opencv-python-headless==4.8.1.78
 Pillow==10.1.0
-pytesseract==0.3.10
+numpy==1.24.3
